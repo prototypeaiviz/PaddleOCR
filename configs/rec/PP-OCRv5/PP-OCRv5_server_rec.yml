@@ -3,24 +3,24 @@ Global:
   debug: false
   use_gpu: true
   epoch_num: 75
-  log_smooth_window: 20
-  print_batch_step: 10
-  save_model_dir: ./output/PP-OCRv5_server_rec
-  save_epoch_step: 1
-  eval_batch_step: [0, 2000]
-  cal_metric_during_train: true
+  log_smooth_window: 20 # Log queue length, the median value in the queue each time will be printed
+  print_batch_step: 10 # Set print log interval
+  save_model_dir: ./output/PP-OCRv5_server_rec # Set model save path
+  save_epoch_step: 1 # Set model save interval
+  eval_batch_step: [0, 2000] # running evalution every 2000 steps
+  cal_metric_during_train: true # Set whether to evaluate the metric during the training process.
   calc_epoch_interval: 1
-  pretrained_model: 
-  checkpoints:
-  save_inference_dir:
-  use_visualdl: false
-  infer_img: doc/imgs_words/ch/word_1.jpg
-  character_dict_path: ./ppocr/utils/dict/ppocrv5_dict.txt
-  max_text_length: &max_text_length 25
+  pretrained_model: ./pretrained_models/PP-OCRv5_server_rec_pretrained.pdparams # Set the path of the pre-trained model
+  checkpoints: # set model parameter path
+  save_inference_dir: #
+  use_visualdl: false # et whether to enable visualdl for visual log display
+  infer_img: doc/imgs_words/ch/word_1.jpg # Set inference image path or folder path
+  character_dict_path: ./ppocr/utils/dict/ppocrv5_dict.txt # Set dictionary path
+  max_text_length: &max_text_length 25 # Set the maximum length of text
   infer_mode: false
-  use_space_char: true
-  distributed: true
-  save_res_path: ./output/rec/predicts_ppocrv5.txt
+  use_space_char: true # Set whether to recognize spaces
+  distributed: false
+  save_res_path: ./output/rec/predicts_ppocrv5.txt # Set the save address of the test model results
   d2s_train_image_shape: [3, 48, 320]
 
 
@@ -67,7 +67,7 @@ Loss:
     - CTCLoss:
     - NRTRLoss:
 
-PostProcess:  
+PostProcess:
   name: CTCLabelDecode
 
 Metric:
@@ -78,10 +78,10 @@ Train:
   dataset:
     name: MultiScaleDataSet
     ds_width: false
-    data_dir: ./train_data/
+    data_dir: /media/mostafahaggag/D/Data/OCR/intern_data/work/train_data/icdar15_rec
     ext_op_transform_idx: 1
     label_file_list:
-    - ./train_data/train_list.txt
+    - /media/mostafahaggag/D/Data/OCR/intern_data/work/train_data/icdar15_rec/rec_gt_train.txt
     transforms:
     - DecodeImage:
         img_mode: BGR
@@ -99,7 +99,7 @@ Train:
   sampler:
     name: MultiScaleSampler
     scales: [[320, 32], [320, 48], [320, 64]]
-    first_bs: &bs 128
+    first_bs: &bs 32
     fix_bs: false
     divided_factor: [8, 16] # w, h
     is_training: True
@@ -111,9 +111,9 @@ Train:
 Eval:
   dataset:
     name: SimpleDataSet
-    data_dir: ./train_data
+    data_dir: /media/mostafahaggag/D/Data/OCR/intern_data/work/train_data/icdar15_rec
     label_file_list:
-    - ./train_data/val_list.txt
+    - /media/mostafahaggag/D/Data/OCR/intern_data/work/train_data/icdar15_rec/rec_gt_val.txt
     transforms:
     - DecodeImage:
         img_mode: BGR
