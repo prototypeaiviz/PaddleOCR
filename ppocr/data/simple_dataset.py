@@ -22,21 +22,30 @@ from paddle.io import Dataset
 from .imaug import transform, create_operators
 from paddle import get_device
 
-
+'''
+This code defines a custom dataset class, SimpleDataSet,
+typically used in deep learning frameworks like PyTorch or PaddlePaddle (it inherits from Dataset).
+It is designed to handle image data and their corresponding labels for tasks like OCR (Optical Character Recognition) or object detection.
+'''
 class SimpleDataSet(Dataset):
     def __init__(self, config, mode, logger, seed=None):
         super(SimpleDataSet, self).__init__()
+        # Initializes the parent Dataset class.
         self.logger = logger
         self.mode = mode.lower()
+        # Stores a logger for debugging and the mode (e.g., 'train', 'test').
 
         global_config = config["Global"]
         dataset_config = config[mode]["dataset"]
         loader_config = config[mode]["loader"]
+        # extracts specific settings from a nested configuration dictionary.
 
         self.delimiter = dataset_config.get("delimiter", "\t")
+        # Sets the character (defaulting to tab \t) that separates the filename from the label in your text files.
         label_file_list = dataset_config.pop("label_file_list")
         data_source_num = len(label_file_list)
         ratio_list = dataset_config.get("ratio_list", 1.0)
+        # Identifies which files contain the data list and what percentage of each file to use (useful for mixing datasets).
         if isinstance(ratio_list, (float, int)):
             ratio_list = [float(ratio_list)] * int(data_source_num)
 
@@ -44,13 +53,18 @@ class SimpleDataSet(Dataset):
             len(ratio_list) == data_source_num
         ), "The length of ratio_list should be the same as the file_list."
         self.data_dir = dataset_config["data_dir"]
+        # The root directory where the actual images are stored.
         self.do_shuffle = loader_config["shuffle"]
+        # Determines if the data order should be randomized.
         self.seed = seed
         logger.info("Initialize indexes of datasets:%s" % label_file_list)
         self.data_lines = self.get_image_info_list(label_file_list, ratio_list)
+        # Calls a helper function to read all labels from the files into a single list.
         self.data_idx_order_list = list(range(len(self.data_lines)))
+        #  Creates a list of indices $[0, 1, 2, ...]$ used to track the order of data.
         if self.mode == "train" and self.do_shuffle:
             self.shuffle_data_random()
+        # Initializes the image processing pipeline (resizing, normalizing, augmenting).
         self.ops = create_operators(dataset_config["transforms"], global_config)
         self.ext_op_transform_idx = dataset_config.get("ext_op_transform_idx", 2)
         self.need_reset = True in [x < 1 for x in ratio_list]
@@ -59,22 +73,30 @@ class SimpleDataSet(Dataset):
         if isinstance(file_list, str):
             file_list = [file_list]
         data_lines = []
+        # iterates through each label file provided.
         for idx, file in enumerate(file_list):
             with open(file, "rb") as f:
+                # : Reads all lines (rows) from the current label file.
                 lines = f.readlines()
                 if self.mode == "train" or ratio_list[idx] < 1.0:
                     random.seed(self.seed)
                     lines = random.sample(lines, round(len(lines) * ratio_list[idx]))
+                # If a ratio is less than 1.0 (e.g., 0.5),
+                # it randomly picks only 50% of the lines from that specific file.
+                # This is great for balancing datasets of different sizes.
                 data_lines.extend(lines)
         return data_lines
 
     def shuffle_data_random(self):
         random.seed(self.seed)
         random.shuffle(self.data_lines)
+        # shuffle_data_random(): Shuffles the data_lines list in place.
         return
 
     def _try_parse_filename_list(self, file_name):
         # multiple images -> one gt label
+        # If a "filename" is actually a JSON list of filenames (like ["img1.jpg", "img2.jpg"]),
+        # it randomly picks one. This is common in "multiple views" training.
         if len(file_name) > 0 and file_name[0] == "[":
             try:
                 info = json.loads(file_name)
@@ -84,6 +106,11 @@ class SimpleDataSet(Dataset):
         return file_name
 
     def get_ext_data(self):
+        """
+        This is a specialized function for data augmentation (likely for techniques like Mosaic or Mixup).
+        It randomly picks additional images from the dataset to be blended with the current one.
+        Returns:
+        """
         ext_data_num = 0
         for op in self.ops:
             if hasattr(op, "ext_data_num"):
@@ -136,6 +163,7 @@ class SimpleDataSet(Dataset):
             data["ext_data"] = self.get_ext_data()
             data["filename"] = data["img_path"]
             outs = transform(data, self.ops)
+            # Passes the image and label through the preprocessing pipeline (e.g., converting the raw bytes into a tensor).
         except:
             self.logger.error(
                 "When parsing line {}, error happened with msg: {}".format(
@@ -154,6 +182,7 @@ class SimpleDataSet(Dataset):
         return outs
 
     def __len__(self):
+        # Simply tells the data loader how many total samples are available in the dataset.
         return len(self.data_idx_order_list)
 
 
@@ -238,6 +267,7 @@ class MultiScaleDataSet(SimpleDataSet):
                 img = f.read()
                 data["image"] = img
             data["ext_data"] = self.get_ext_data()
+            # Attaches extra samples if needed for complex augmentations.
             outs = transform(data, self.ops[:-1])
             if outs is not None:
                 outs = self.resize_norm_img(outs, img_width, img_height)

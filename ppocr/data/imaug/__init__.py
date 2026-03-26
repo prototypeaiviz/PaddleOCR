@@ -78,8 +78,12 @@ def transform(data, ops=None):
 
 def create_operators(op_param_list, global_config=None):
     """
-    create operators based on the config
-
+    create operators based on the coDecodeImagenfig
+    like that you automatically keep calling everything
+    you have operator called DecodeImage ppocr/data/imaug/operators.py
+    RecAug called from ppocr/data/imaug/rec_img_aug.py
+    MultiLabelEncode
+    KeepKeys
     Args:
         params(list): a dict list, used to create some operators
     """

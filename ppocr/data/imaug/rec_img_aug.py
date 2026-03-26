@@ -31,7 +31,10 @@ from .abinet_aug import (
 from paddle import get_device
 from paddle.vision.transforms import Compose
 
-
+'''
+In machine learning, data augmentation creates "fake" variations of your training images (adding noise, blurring, or warping them)
+ so the AI learns to be robust and doesn't get confused by real-world imperfections like shaky cameras or bad lighting.
+'''
 class RecAug(object):
     def __init__(
         self,
@@ -44,6 +47,22 @@ class RecAug(object):
         hsv_aug_prob=0.4,
         **kwargs,
     ):
+        '''
+        This is the "Master" class. It manages high-level distortions and then passes the result to the base augmentations.
+        TIA Distortions (tia_prob): This is the "secret sauce" for OCR. TIA (Tiny Image Augmentation) uses mathematical warping to bend, stretch,
+        and twist text.tia_distort: Locally warps parts of the text.tia_stretch: Drags the text horizontally or vertically.tia_perspective:
+        Tilts the text as if the camera was at an angle.Size Check: It only applies these
+        if the image is at least $20 \times 20$ pixels to avoid destroying tiny, unreadable images
+        Args:
+            tia_prob:
+            crop_prob:
+            reverse_prob:
+            noise_prob:
+            jitter_prob:
+            blur_prob:
+            hsv_aug_prob:
+            **kwargs:
+        '''
         self.tia_prob = tia_prob
         self.bda = BaseDataAugmentation(
             crop_prob, reverse_prob, noise_prob, jitter_prob, blur_prob, hsv_aug_prob
@@ -77,6 +96,17 @@ class BaseDataAugmentation(object):
         hsv_aug_prob=0.4,
         **kwargs,
     ):
+        '''
+        This class handles standard image processing "attacks" to simulate different environmental conditions.
+        Args:
+            crop_prob:
+            reverse_prob:
+            noise_prob:
+            jitter_prob:
+            blur_prob:
+            hsv_aug_prob:
+            **kwargs:
+        '''
         self.crop_prob = crop_prob
         self.reverse_prob = reverse_prob
         self.noise_prob = noise_prob
@@ -87,29 +117,58 @@ class BaseDataAugmentation(object):
         self.fil = cv2.getGaussianKernel(ksize=5, sigma=1, ktype=cv2.CV_32F)
 
     def __call__(self, data):
+        '''
+        Summary of Workflow
+        Input: A clean image of text.
+
+        Step 1: Apply TIA (Warping/Bending).
+
+        Step 2: Apply Base Augs (Blur, Noise, Color shift, Inversion).
+
+        Output: A messy, distorted version of the original text that forces the AI to "work harder" to read it.
+        Args:
+            data:
+
+        Returns:
+
+        '''
         img = data["image"]
         h, w, _ = img.shape
 
         if random.random() <= self.crop_prob and h >= 20 and w >= 20:
+            # Misaligned scanning
+            # Randomly snips off the edges of the image.
             img = get_crop(img)
 
         if random.random() <= self.blur_prob:
             # GaussianBlur
+            # Out-of-focus camera
+            # Applies a Gaussian Blur using a $5 \times 5$ kernel.
             img = cv2.sepFilter2D(img, -1, self.fil, self.fil)
 
         if random.random() <= self.hsv_aug_prob:
+            # Different lighting colors
+            # Shifts the Hue, Saturation, and Value (brightness).
             img = hsv_aug(img)
 
         if random.random() <= self.jitter_prob:
+            # Brightness/Contrast shifts
+            # Randomly changes how bright or sharp the image looks.
             img = jitter(img)
 
         if random.random() <= self.noise_prob:
+            # Low-quality sensor grain
+            # Adds "static" or graininess to the pixels.
             img = add_gaussian_noise(img)
 
         if random.random() <= self.reverse_prob:
+            # Inverted text (White on Black)
+            # Flips the colors so black becomes white and vice versa.
             img = 255 - img
 
         data["image"] = img
+        # It expects a dictionary data containing the key "image".
+        # It modifies the image and puts it back into that dictionary for the next step in the training pipeline.
         return data
 
 
