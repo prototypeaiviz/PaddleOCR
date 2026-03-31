@@ -1,0 +1,136 @@
+Global:
+  model_name: PP-OCRv5_server_rec # To use static model for inference.
+  debug: false
+  use_gpu: true
+  epoch_num: 75
+  log_smooth_window: 20 # Log queue length, the median value in the queue each time will be printed
+  print_batch_step: 10 # Set print log interval
+  save_model_dir: ./output/PP-OCRv5_server_rec # Set model save path
+  save_epoch_step: 1 # Set model save interval
+  eval_batch_step: [0, 2000] # running evalution every 2000 steps
+  cal_metric_during_train: true # Set whether to evaluate the metric during the training process.
+  calc_epoch_interval: 1
+  pretrained_model: ./pretrained_models/PP-OCRv5_server_rec_pretrained.pdparams # Set the path of the pre-trained model
+  checkpoints: # set model parameter path
+  save_inference_dir: #
+  use_visualdl: false # et whether to enable visualdl for visual log display
+  infer_img: doc/imgs_words/ch/word_1.jpg # Set inference image path or folder path
+  character_dict_path: ./ppocr/utils/dict/ppocrv5_dict.txt # Set dictionary path
+  max_text_length: &max_text_length 25 # Set the maximum length of text
+  infer_mode: false
+  use_space_char: true # Set whether to recognize spaces
+  distributed: false
+  save_res_path: ./output/rec/predicts_ppocrv5.txt # Set the save address of the test model results
+  d2s_train_image_shape: [3, 48, 320]
+
+
+Optimizer:
+  name: Adam
+  beta1: 0.9
+  beta2: 0.999
+  lr:
+    name: Cosine
+    learning_rate: 0.0005
+    warmup_epoch: 1
+  regularizer:
+    name: L2
+    factor: 3.0e-05
+
+
+Architecture:
+  model_type: rec
+  algorithm: SVTR_HGNet
+  Transform:
+  Backbone:
+    name: PPHGNetV2_B4
+    text_rec: True
+  Head:
+    name: MultiHead
+    head_list:
+      - CTCHead:
+          Neck:
+            name: svtr
+            dims: 120
+            depth: 2
+            hidden_dims: 120
+            kernel_size: [1, 3]
+            use_guide: True
+          Head:
+            fc_decay: 0.00001
+      - NRTRHead:
+          nrtr_dim: 384
+          max_text_length: *max_text_length
+
+Loss:
+  name: MultiLoss
+  loss_config_list:
+    - CTCLoss:
+    - NRTRLoss:
+
+PostProcess:
+  name: CTCLabelDecode
+
+Metric:
+  name: RecMetric
+  main_indicator: acc
+
+Train:
+  dataset:
+    name: MultiScaleDataSet
+    ds_width: false
+    data_dir: /media/mostafahaggag/D/Data/OCR/intern_data/work/train_data/icdar15_rec
+    ext_op_transform_idx: 1
+    label_file_list:
+    - /media/mostafahaggag/D/Data/OCR/intern_data/work/train_data/icdar15_rec/rec_gt_train.txt
+    transforms:
+    - DecodeImage:
+        img_mode: BGR
+        channel_first: false
+    - RecAug:
+    - MultiLabelEncode:
+        gtc_encode: NRTRLabelEncode
+    - KeepKeys:
+        keep_keys:
+        - image
+        - label_ctc
+        - label_gtc
+        - length
+        - valid_ratio
+  sampler:
+    name: MultiScaleSampler
+    scales: [[320, 32], [320, 48], [320, 64]]
+    first_bs: &bs 32
+    fix_bs: false
+    divided_factor: [8, 16] # w, h
+    is_training: True
+  loader:
+    shuffle: true
+    batch_size_per_card: *bs
+    drop_last: true
+    num_workers: 16
+Eval:
+  dataset:
+    name: SimpleDataSet
+    data_dir: /media/mostafahaggag/D/Data/OCR/intern_data/work/train_data/icdar15_rec
+    label_file_list:
+    - /media/mostafahaggag/D/Data/OCR/intern_data/work/train_data/icdar15_rec/rec_gt_val.txt
+    transforms:
+    - DecodeImage:
+        img_mode: BGR
+        channel_first: false
+    - MultiLabelEncode:
+        gtc_encode: NRTRLabelEncode
+    - RecResizeImg:
+        image_shape: [3, 48, 320]
+    - KeepKeys:
+        keep_keys:
+        - image
+        - label_ctc
+        - label_gtc
+        - length
+        - valid_ratio
+  loader:
+    shuffle: false
+    drop_last: false
+    batch_size_per_card: 128
+    num_workers: 4

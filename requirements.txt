@@ -1,5 +1,17 @@
-numpy>=1.24
-opencv-python>=4.8
-Pillow>=10.0
-matplotlib>=3.8
-PyYAML>=6.0
+shapely
+scikit-image
+pyclipper
+lmdb
+tqdm
+numpy
+rapidfuzz
+opencv-python
+opencv-contrib-python
+cython
+Pillow
+pyyaml
+requests
+albumentations
+# to be compatible with albumentations
+albucore
+packaging
